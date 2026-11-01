@@ -101,6 +101,14 @@ python3 build-worker.py
 
 `_worker.js` 是 `build-worker.py` 生成的 Cloudflare Pages 高级模式静态入口。变更 `index.html`、`app.js` 或 `style.css` 后要重新生成 `_worker.js` 并提交；CI 会检查其同步情况。
 
-**注意：推送 GitHub 本身不会更新线上站点。** 当前 Cloudflare Pages `sj-collection` 是直接上传项目，还没有关联 GitHub 仓库；后续若需要自动部署，应先在 Cloudflare 后台确认连接方式与构建输出，单独进行迁移验证。后端仍由服务器的 `sj-collection.service` 提供，部署时必须有独立备份和回滚安排，不应直接把 GitHub 的每次提交自动覆盖到 `/opt/sj-collection`。
+**自动部署方式：** 现有 Cloudflare Pages `sj-collection` 属于 Direct Upload 类型，不能原地改为 Cloudflare 原生 Git 集成。仓库在 `.github/workflows/ci.yml` 中配置了 GitHub Actions → Cloudflare Pages（Wrangler）工作流：仅在 `main` 分支推送或人工触发时，且项目测试通过后，才部署前端文件到原 Pages 项目；PR 不部署到生产。后端仍由服务器的 `sj-collection.service` 独立运行，不参与自动部署。
+
+首次启用需要仓库管理员自行完成一次最小权限凭证配置：
+
+1. Cloudflare 控制台 [Account API Tokens](https://dash.cloudflare.com/?to=/:account/api-tokens) 创建 Custom Token，权限选择 **Account → Cloudflare Pages → Edit**，资源限定到当前账户。
+2. GitHub 仓库 [Actions secrets](https://github.com/yhwlwl/sta-sj/settings/secrets/actions) 新建 Repository secret，名称为 **`CLOUDFLARE_API_TOKEN`**，值为上一步生成的令牌。**不要将令牌提交到代码、README 或聊天。**
+3. 现有 Cloudflare Account ID 已写入工作流，无需另建 secret。配置好令牌后，在 [Verify and deploy](https://github.com/yhwlwl/sta-sj/actions/workflows/ci.yml) 点击 **Run workflow** 选择 `main`，完成首次部署验证。此后推送 `main` 自动测试并部署；没有令牌时，测试正常运行，发布步骤会明确标注跳过。
+
+Pages 部署目录仅包含由源码生成的 `_worker.js` 及 `index.html`、`app.js`、`style.css`，不会上传后端数据库、投稿文件或凭证。若要部署后端，必须另建经过备份、审查和回滚设计的独立流程。
 
 本地开发环境的 `SJ_DATA=./local-data` 只能用于开发和测试，生产持久数据应继续保存在 `/var/lib/sj-collection`。不要将生产数据库或运行时配置复制到仓库。

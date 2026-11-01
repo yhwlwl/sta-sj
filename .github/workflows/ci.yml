@@ -1,9 +1,10 @@
-name: Verify
+name: Verify and deploy
 
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -23,3 +24,38 @@ jobs:
         run: |
           python3 build-worker.py
           git diff --exit-code -- _worker.js
+
+  deploy:
+    name: Deploy frontend to existing Cloudflare Pages
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    env:
+      CF_TOKEN_READY: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+    steps:
+      - name: Check Cloudflare deployment credentials
+        run: |
+          if [ "$CF_TOKEN_READY" != "true" ]; then
+            echo '::notice::Cloudflare deployment skipped: add CLOUDFLARE_API_TOKEN under repository Settings -> Secrets and variables -> Actions.'
+          fi
+      - name: Check out source
+        if: env.CF_TOKEN_READY == 'true'
+        uses: actions/checkout@v4
+      - name: Assemble Pages output
+        if: env.CF_TOKEN_READY == 'true'
+        run: |
+          mkdir -p dist
+          cp _worker.js index.html app.js style.css dist/
+          test -s dist/_worker.js
+          test -s dist/index.html
+      - name: Deploy to sj-collection (production)
+        if: env.CF_TOKEN_READY == 'true'
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: '1878cfd59e85eff9ffe460e98b26295c'
+          command: pages deploy dist --project-name=sj-collection --branch=main
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
