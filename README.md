@@ -101,14 +101,36 @@ python3 build-worker.py
 
 `_worker.js` 是 `build-worker.py` 生成的 Cloudflare Pages 高级模式静态入口。变更 `index.html`、`app.js` 或 `style.css` 后要重新生成 `_worker.js` 并提交；CI 会检查其同步情况。
 
-**自动部署方式：** 现有 Cloudflare Pages `sj-collection` 属于 Direct Upload 类型，不能原地改为 Cloudflare 原生 Git 集成。仓库在 `.github/workflows/ci.yml` 中配置了 GitHub Actions → Cloudflare Pages（Wrangler）工作流：仅在 `main` 分支推送或人工触发时，且项目测试通过后，才部署前端文件到原 Pages 项目；PR 不部署到生产。后端仍由服务器的 `sj-collection.service` 独立运行，不参与自动部署。
+**当前部署方式：** Cloudflare Pages 项目已关联 GitHub 仓库的 main 分支。GitHub Actions 仅运行测试，不再通过 Wrangler 重复发布。
 
-首次启用需要仓库管理员自行完成一次最小权限凭证配置：
-
-1. Cloudflare 控制台 [Account API Tokens](https://dash.cloudflare.com/?to=/:account/api-tokens) 创建 Custom Token，权限选择 **Account → Cloudflare Pages → Edit**，资源限定到当前账户。
-2. GitHub 仓库 [Actions secrets](https://github.com/yhwlwl/sta-sj/settings/secrets/actions) 新建 Repository secret，名称为 **`CLOUDFLARE_API_TOKEN`**，值为上一步生成的令牌。**不要将令牌提交到代码、README 或聊天。**
-3. 现有 Cloudflare Account ID 已写入工作流，无需另建 secret。配置好令牌后，在 [Verify and deploy](https://github.com/yhwlwl/sta-sj/actions/workflows/ci.yml) 点击 **Run workflow** 选择 `main`，完成首次部署验证。此后推送 `main` 自动测试并部署；没有令牌时，测试正常运行，发布步骤会明确标注跳过。
-
-Pages 部署目录仅包含由源码生成的 `_worker.js` 及 `index.html`、`app.js`、`style.css`，不会上传后端数据库、投稿文件或凭证。若要部署后端，必须另建经过备份、审查和回滚设计的独立流程。
+**后端部署独立进行：** SSH 服务器后端不随 GitHub 自动更新；升级前必须备份数据库，完成隔离环境测试并准备回滚。
 
 本地开发环境的 `SJ_DATA=./local-data` 只能用于开发和测试，生产持久数据应继续保存在 `/var/lib/sj-collection`。不要将生产数据库或运行时配置复制到仓库。
+
+
+## 科幻创作征集站第一版（开发分支）
+
+本次改版将一份参赛作品与文件独立关联。活动、类别、作者身份、多个附件、私密回执及后台收件清单由 scifi.cjs 提供，原文件仍通过现有分片上传和 SHA-256 校验储存在服务器。
+
+- 学生端 /：选择类别、填写年级班级姓名和作品名、上传附件、确认、保存私密回执。支持在当前浏览器继续未完成的草稿。
+- 管理后台 /mg 保留原功能；新增 /mg/works 作品工作台，可按类别、年级、班级、姓名搜索、下载原件、导出 CSV、修改活动说明。
+- 活动截止预设为 2027 年 1 月 10 日 23:59（北京时间），包含六个明确的投稿入口和专项类形式选择。
+- 作品字数、视频时长、图片 DPI、原创性及正文匿名要求需要人工核验；系统只对可可靠判断的字段与附件扩展名进行自动验证。
+- 校内评审、评委权限、评分、排名、奖项和邮箱替代方案未确定，本版不实现。
+
+安全：学生姓名、年级班级独立保存在数据库，仅授权管理员可访问。回执需不可猜测的私密凭证。不得将生产数据库、上传文件或密钥提交到仓库。
+
+Cloudflare 已通过 GitHub main 分支原生集成部署前端。PR 可生成前端预览，但生产 SSH 后端的新接口未部署前，预览不能完成真实投稿；后端应独立测试、备份并发布。
+
+
+## 第三届科幻创作征集界面说明
+
+- 六类完整内容要求来自正式通知的附件 1，第 9—11 页；六枚类别图标为本项目原创 SVG。
+
+- Logo 原图复用本组织 sta-bx 项目的 public/sta-logo.jpg，并作为站内资源内联打包。
+
+- 小说和作文在作品文件之外均需提交原创性查重报告 PDF。软件校验附件数量和扩展名，查重率和真伪需要人工审核。
+
+- 截止时间设为 2027-04-30 23:59:59（北京时间）。
+
+- 通知 PDF 正式文件尚未随仓库发布，请补充原件后再开启站内下载入口。
