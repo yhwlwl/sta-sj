@@ -24,7 +24,7 @@ module.exports=function mount({app,base,db,auth,admin,now,clean,fail,audit,cfg,l
  'CREATE INDEX IF NOT EXISTS scifi_filters ON scifi_submissions(status,category_id,grade,class_name,submitted);'
  );
  db.prepare('INSERT OR IGNORE INTO scifi_event(id,title,description,deadline,open) VALUES (?,?,?,?,1)')
- .run(EVENT,'“拓科学教育新路，促想象力提升”科幻创作征集活动','发挥科学想象力，创作属于自己的未来世界。','2027-01-10T23:59:59+08:00');
+ .run(EVENT,'“拓科学教育新路，促想象力提升”科幻创作征集活动','发挥科学想象力，创作属于自己的未来世界。','2027-04-30T23:59:59+08:00');
  const addCategory=db.prepare('INSERT OR IGNORE INTO scifi_categories(id,title,group_name,description,rules,extensions,allow_team) VALUES (?,?,?,?,?,?,?)');
  for(const x of initialCategories)addCategory.run(x[0],x[1],x[2],x[3],x[4],x[5],x[6]);
  const getEvent=()=>db.prepare('SELECT * FROM scifi_event WHERE id=?').get(EVENT);
@@ -95,7 +95,8 @@ module.exports=function mount({app,base,db,auth,admin,now,clean,fail,audit,cfg,l
    const ext=path.extname(f.filename).replace('.','').toLowerCase();
    if(!extensions.includes(ext))throw fail(400,'该类别不接受文件格式：'+f.filename);
   }
-  if(['novel','essay','painting','aigc'].includes(c.id)&&files.length!==1)throw fail(400,'此类别需要提交一份主作品文件');
+  if(['painting','aigc'].includes(c.id)&&files.length!==1)throw fail(400,'此类别需要提交一份主作品文件');
+  if(['novel','essay'].includes(c.id)&&(files.length!==2||!files.some(f=>/\.pdf$/i.test(f.filename))))throw fail(400,'文学类须提交作品正文和查重报告 PDF，共两份文件');
   if(s.category_id==='creative'&&!files.some(f=>/\.(pdf|docx)$/i.test(f.filename))&&!s.statement)throw fail(400,'请填写作品说明或上传作品说明文档');
   if(s.category_id==='tianfu'){
    const t=s.work_type;
