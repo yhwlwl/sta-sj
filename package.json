@@ -1,0 +1,22 @@
+{
+  "name": "sj-collection",
+  "version": "1.0.0",
+  "main": "server.cjs",
+  "scripts": {
+    "start": "node server.cjs",
+    "test": "node test.cjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "SJ original media collection portal",
+  "dependencies": {
+    "better-sqlite3": "12.11.1",
+    "express": "5.3.0",
+    "yazl": "3.3.1"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=20.19"
+  }
+}

@@ -1,0 +1,39 @@
+# Dependencies and local tooling
+node_modules/
+.npm/
+.DS_Store
+*.log
+coverage/
+
+# Local and production data — never version uploads or SQLite
+local-data/
+data/
+objects/
+chunks/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.db-journal
+*.db-wal
+*.db-shm
+setup-token
+.sj-managed
+
+# Credentials and private config
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+
+# Packaging and temporary files
+*.zip
+*.tar
+*.tar.gz
+__pycache__/
+*.py[cod]

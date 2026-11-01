@@ -1,0 +1,53 @@
+{
+  "api_integration": {
+    "passed": true,
+    "checks": 59
+  },
+  "dependency_audit": {
+    "known_vulnerabilities": 0,
+    "zip_library": "yazl 3.3.1"
+  },
+  "cli_upload_test": {
+    "sizes_mib": [
+      1,
+      8,
+      32
+    ],
+    "attempts_each": 3,
+    "successes": 9,
+    "integrity_passes": 9,
+    "source": "managed cloud via proxy, not mainland residential network"
+  },
+  "cloud_browser_upload_test": {
+    "size_mib": 8,
+    "seconds": 5.3,
+    "mib_per_second": 1.52,
+    "integrity_passed": true
+  },
+  "owner_screenshot_test": {
+    "size_mib": 8,
+    "seconds_displayed": 0.7,
+    "mib_per_second_displayed": 10.9,
+    "integrity_passed": true
+  },
+  "browser_ui": {
+    "login_page": true,
+    "guest_entry": true,
+    "upload_page": true,
+    "speedtest": true,
+    "end_to_end_upload": {
+      "bytes": 9437221,
+      "status": "complete",
+      "sha256": "722799f99587061bd495dfa6316912aaf03428e934cd32dffdb2c82d38819db6",
+      "source": "browser-generated synthetic File through the production queue and API"
+    },
+    "file_picker": "local chooser automation timed out; upload pipeline verified with a browser-generated fixture"
+  },
+  "custom_domain": {
+    "name": "sj.stacdqz.tech",
+    "cloudflare_binding": "active",
+    "dns": "active",
+    "verified_on": "2026-10-31",
+    "source": "Cloudflare Pages project/domains API"
+  }
+}

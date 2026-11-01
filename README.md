@@ -1,3 +1,106 @@
 # SJ 素材征集站
 
-项目源码正在导入。
+已部署的前端： https://sj-collection.pages.dev/
+
+目标域名： https://sj.stacdqz.tech/
+
+管理后台：前端同域名的 `/mg`。原文件、数据库和审计记录位于阿里云成都服务器 `47.109.130.222`，浏览器直接上传到 `https://pan.tantantan.tech/sj-api/v1`，不通过 Cloudflare 中转文件。前端页面打开仍取决于跨境线路，不保证所有国内网络的页面首屏速度。
+
+## 已实现
+
+- 账号注册、登录、游客投稿，管理员独立权限；密码使用随机盐和 scrypt 保存。
+- 多文件队列、8MiB 分片、失败重试、暂停后继续；重新选择同名、同大小、同修改时间的原文件可以继续保存在服务端的分片。
+- 每片 SHA-256 校验，合并后生成完整文件 SHA-256；32MiB 以下还核对浏览器计算的完整文件哈希。无转码或图片压缩。
+- 本人投稿历史；其他用户和游客不能读取他人的文件。
+- `/mg` 包含收件概览、每日收件数量、用户和游客数、访问与下载次数、存储配额、文件筛选、单个下载、最多 100 个文件打包下载、CSV 导出。
+- 回收站、恢复、确认后永久删除；停用用户；征集开关、游客和注册开关、标题、说明、文件与空间上限。
+- 登录、上传、下载、管理操作日志，记录时间、操作者、IP 和操作详情，保留 180 天。
+- 页面内提供真实浏览器上传测速；随机测速数据不保存为投稿。
+
+## 首次管理员设置
+
+首次启动生成一个只保存在服务器上的初始化凭证：
+
+`/var/lib/sj-collection/setup-token`
+
+站点所有者通过 SSH 读取，打开 `/mg#setup=初始化凭证`，自行设置管理员账号与密码。凭证在初始化成功后失效并从磁盘移除。请勿把凭证、完整初始化链接或登录令牌放入公开仓库。
+
+已有管理员时，`/mg` 显示登录入口。若当前浏览器以游客登录，请先切换管理员账号；带有有效首次初始化凭证的入口会直接进入初始化表单。
+
+## 域名状态（2026-10-31 核查）
+
+Cloudflare Pages 项目 `sj-collection` 的 `sj.stacdqz.tech` 自定义域名已显示 **active**，生产部署状态为 success。
+
+- 正式地址：<https://sj.stacdqz.tech/>
+- Pages 备用地址：<https://sj-collection.pages.dev/>
+- 后端 API：<https://pan.tantantan.tech/sj-api/v1>
+
+DNS 由阿里云维护。不要在维护代码时顺手改动现有 DNS、Nginx 或其他业务记录。
+
+## 服务器运行位置
+
+- 运行代码：`/opt/sj-collection`，root 拥有，只读。
+- 开发副本和依赖锁文件：`/home/admin/sj-collection`。
+- 持久数据：`/var/lib/sj-collection`，独立系统用户 `sj-collector` 拥有。
+- SQLite 数据库：`/var/lib/sj-collection/collection.sqlite`，启用 WAL。
+- 原文件：`/var/lib/sj-collection/objects`，文件名为内部 UUID，原始名称保存在数据库中。
+- 待合并分片：`/var/lib/sj-collection/chunks`；超过 48 小时的未完成上传会清理。
+- 服务：`sj-collection.service`，仅监听 `127.0.0.1:18877`，自动重启、开机启动，独立受限用户运行。
+- Nginx 附加配置：`/www/server/panel/vhost/nginx/extension/pan.tantantan.tech/sj-collection.conf`。只新增 `/sj-api/` 路由，保留既有站点。
+
+查看运行状态：`sudo systemctl status sj-collection.service`
+
+查看错误日志：`sudo journalctl -u sj-collection.service -n 100 --no-pager`
+
+重启服务：`sudo systemctl restart sj-collection.service`
+
+数据库和原文件要一起备份。数据库正在运行时应使用 SQLite backup API，不应只复制主 `.sqlite` 文件。当前没有配置异地备份。
+
+## 默认额度与限制
+
+- 单文件 1024MB，总配额 8GB；后台可调。配额包含回收站和上传中的预留空间。
+- 至少保留 3GB 服务器磁盘空间。启用大文件时应同时关注合并分片的临时空间。
+- 游客每 24 小时最多 30 次、合计 2GB；注册用户最多 100 次、合计 5GB；另有限制频率的保护。
+- 游客令牌只保存在当前浏览器。清理浏览器、切换域名或退出后可能无法恢复自己的投稿身份；文件仍保留给管理员。
+- 访问其他投稿者的上传详情会被拒绝；原文件只能由管理员通过短期下载凭证下载。
+- 总存储依赖现有服务器，超过磁盘容量需要扩容或归档清理，不是无限免费存储。
+
+## 验证记录
+
+`node test.cjs` 在临时独立数据库中完成 59 项接口检查，测试数据自动清除，覆盖身份认证、权限隔离、分片校验与重试、合并、原文件下载、ZIP 内容一致性、CSV、配额、回收站与日志。最终运行依赖审计未发现已知漏洞。
+
+命令行经云端代理到成都服务器的 9 次上传全部成功，哈希一致。32MiB 三次分别约 56、61、60 秒。另一条云端浏览器路径上传 8MiB 用时约 5.3 秒（1.52MiB/s），校验成功。它们都不是国内居民宽带实测，不能当作国内各运营商速度承诺；请使用页面内“本机测速”从实际投稿网络确认。
+
+站点所有者随后从自己的实际网络进行了页面内测速，截图显示 **10.90MB/s，8MB 约 0.7 秒，完整性校验通过**。据此选择继续使用自建直传方案，不切换飞书。8MB 是短时测速，长视频、多用户并发和管理员下载速度仍受实际带宽与磁盘负载影响。
+
+浏览器登录、游客页面和完整上传链路已验证：通过临时验收页在浏览器中生成 9MiB+37 字节的受控原件，经真实投稿队列、两片上传、合并和 SHA-256 校验，页面显示“已收件”，服务端完整文件哈希与浏览器原件一致。临时验收页不会保留在正式部署中。浏览器的本地文件选择自动化曾发生超时，因此本地文件选择器未完成自动验收；其后的实际上传流程和原文件下载接口均已验证。
+
+## 本地启动与开发
+
+要求 Node.js 20.19+（建议 22 或 24 LTS），安装依赖后：
+
+```
+npm ci
+SJ_DATA=./local-data PORT=18877 node server.cjs
+node test.cjs
+```
+
+后端始终监听回环地址。生产通过 Nginx HTTPS 转发。若本地开发另用前端 origin，可通过 `SJ_ORIGINS` 环境变量增加精确允许的来源，不要放开为 `*`。
+
+前端为无构建依赖的 `index.html`、`app.js`、`style.css`。`_worker.js` 是打包这三个文件的 Cloudflare Pages 高级模式入口，只承载页面和静态资源；它不代理上传请求。前端 API 地址在 `app.js` 顶部定义。
+
+## GitHub 版本管理与上线说明
+
+本项目采用单一仓库管理后端与前端，推荐 `main` 为稳定分支。仓库**只存源码与可重现构建所需配置**，不纳入数据库、投稿文件、分片、安装令牌、环境变量文件、SSH 凭证或 `node_modules`。
+
+```bash
+npm ci
+npm test
+python3 build-worker.py
+```
+
+`_worker.js` 是 `build-worker.py` 生成的 Cloudflare Pages 高级模式静态入口。变更 `index.html`、`app.js` 或 `style.css` 后要重新生成 `_worker.js` 并提交；CI 会检查其同步情况。
+
+**注意：推送 GitHub 本身不会更新线上站点。** 当前 Cloudflare Pages `sj-collection` 是直接上传项目，还没有关联 GitHub 仓库；后续若需要自动部署，应先在 Cloudflare 后台确认连接方式与构建输出，单独进行迁移验证。后端仍由服务器的 `sj-collection.service` 提供，部署时必须有独立备份和回滚安排，不应直接把 GitHub 的每次提交自动覆盖到 `/opt/sj-collection`。
+
+本地开发环境的 `SJ_DATA=./local-data` 只能用于开发和测试，生产持久数据应继续保存在 `/var/lib/sj-collection`。不要将生产数据库或运行时配置复制到仓库。

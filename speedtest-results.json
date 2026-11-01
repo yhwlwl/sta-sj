@@ -1,0 +1,132 @@
+{
+  "source": "managed cloud environment through configured proxy; not a mainland residential network",
+  "target": "Aliyun cn-chengdu HTTPS ingress",
+  "results": [
+    {
+      "mib": 1,
+      "attempt": 1,
+      "curl": "200 8.649245 121233 1048576",
+      "exit": 0,
+      "wall_seconds": 8.658,
+      "body": {
+        "bytes": 1048576,
+        "sha256": "3c0275df7f77b1d36e6d1db7655b3704979f0236837a838c28639721cf19419d",
+        "server_seconds": 2.5596
+      },
+      "integrity_ok": true,
+      "error": ""
+    },
+    {
+      "mib": 1,
+      "attempt": 2,
+      "curl": "200 6.975596 150320 1048576",
+      "exit": 0,
+      "wall_seconds": 6.984,
+      "body": {
+        "bytes": 1048576,
+        "sha256": "3c0275df7f77b1d36e6d1db7655b3704979f0236837a838c28639721cf19419d",
+        "server_seconds": 1.7898
+      },
+      "integrity_ok": true,
+      "error": ""
+    },
+    {
+      "mib": 1,
+      "attempt": 3,
+      "curl": "200 7.915593 132469 1048576",
+      "exit": 0,
+      "wall_seconds": 7.924,
+      "body": {
+        "bytes": 1048576,
+        "sha256": "3c0275df7f77b1d36e6d1db7655b3704979f0236837a838c28639721cf19419d",
+        "server_seconds": 2.7232
+      },
+      "integrity_ok": true,
+      "error": ""
+    },
+    {
+      "mib": 8,
+      "attempt": 1,
+      "curl": "200 19.217586 436506 8388608",
+      "exit": 0,
+      "wall_seconds": 19.23,
+      "body": {
+        "bytes": 8388608,
+        "sha256": "751c7813bc4ededb6c2572e164ebed7e2e407bba2eaed4c6874a565822b8dbc0",
+        "server_seconds": 13.4494
+      },
+      "integrity_ok": true,
+      "error": ""
+    },
+    {
+      "mib": 8,
+      "attempt": 2,
+      "curl": "200 18.312750 458074 8388608",
+      "exit": 0,
+      "wall_seconds": 18.327,
+      "body": {
+        "bytes": 8388608,
+        "sha256": "751c7813bc4ededb6c2572e164ebed7e2e407bba2eaed4c6874a565822b8dbc0",
+        "server_seconds": 12.9532
+      },
+      "integrity_ok": true,
+      "error": ""
+    },
+    {
+      "mib": 8,
+      "attempt": 3,
+      "curl": "200 17.829600 470487 8388608",
+      "exit": 0,
+      "wall_seconds": 17.846,
+      "body": {
+        "bytes": 8388608,
+        "sha256": "751c7813bc4ededb6c2572e164ebed7e2e407bba2eaed4c6874a565822b8dbc0",
+        "server_seconds": 12.8715
+      },
+      "integrity_ok": true,
+      "error": ""
+    },
+    {
+      "mib": 32,
+      "attempt": 1,
+      "curl": "200 56.074309 598392 33554432",
+      "exit": 0,
+      "wall_seconds": 56.108,
+      "body": {
+        "bytes": 33554432,
+        "sha256": "fedb88f28670e861830c8c3c624fc605dd5dfe67b683c5970304c2bc6ae6f8fd",
+        "server_seconds": 50.8291
+      },
+      "integrity_ok": true,
+      "error": ""
+    },
+    {
+      "mib": 32,
+      "attempt": 2,
+      "curl": "200 61.062752 549507 33554432",
+      "exit": 0,
+      "wall_seconds": 61.097,
+      "body": {
+        "bytes": 33554432,
+        "sha256": "fedb88f28670e861830c8c3c624fc605dd5dfe67b683c5970304c2bc6ae6f8fd",
+        "server_seconds": 55.8229
+      },
+      "integrity_ok": true,
+      "error": ""
+    },
+    {
+      "mib": 32,
+      "attempt": 3,
+      "curl": "200 59.949464 559711 33554432",
+      "exit": 0,
+      "wall_seconds": 59.982,
+      "body": {
+        "bytes": 33554432,
+        "sha256": "fedb88f28670e861830c8c3c624fc605dd5dfe67b683c5970304c2bc6ae6f8fd",
+        "server_seconds": 53.7462
+      },
+      "integrity_ok": true,
+      "error": ""
+    }
+  ]
+}
