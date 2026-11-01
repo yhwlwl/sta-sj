@@ -28,7 +28,7 @@ app.use((req,res,next)=>{
  const origin=req.get('Origin');
  if(origin&&!origins.has(origin))return res.status(403).json({error:'请求来源不受支持'});
  if(origin){res.set('Access-Control-Allow-Origin',origin);res.vary('Origin');}
- res.set({'Access-Control-Allow-Methods':'GET, POST, PUT, PATCH, DELETE, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type, X-Chunk-SHA256','Access-Control-Max-Age':'600','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'});
+ res.set({'Access-Control-Allow-Methods':'GET, POST, PUT, PATCH, DELETE, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type, X-Chunk-SHA256, X-Receipt-Key','Access-Control-Max-Age':'600','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'});
  if(req.method==='OPTIONS')return res.sendStatus(204);
  next();
 });
@@ -164,6 +164,7 @@ app.get(base+'/admin/users',auth,admin,(req,res)=>{const {limit,offset}=paginati
 app.post(base+'/admin/users/:id/toggle',auth,admin,(req,res)=>{if(req.params.id===req.user.id)throw fail(400,'不能停用当前管理员');const u=db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id);if(!u||u.role==='admin')throw fail(400,'不能修改此账号');db.transaction(()=>{db.prepare('UPDATE users SET disabled=? WHERE id=?').run(u.disabled?0:1,u.id);if(!u.disabled)db.prepare('DELETE FROM sessions WHERE user_id=?').run(u.id);})();audit(req,u.disabled?'user_enable':'user_disable',null,{id:u.id,name:u.name});res.json({ok:true});});
 app.get(base+'/admin/settings',auth,admin,(req,res)=>res.json({...cfg(),storage:storage()}));
 app.patch(base+'/admin/settings',auth,admin,(req,res)=>{const v=req.body,changes={};for(const k of ['open','guests','registration'])if(typeof v[k]==='boolean')changes[k]=v[k];if(v.title!==undefined)changes.title=clean(v.title,60)||'素材征集';if(v.notice!==undefined)changes.notice=clean(v.notice,2000);if(v.maxFileMB!==undefined){if(!Number.isInteger(v.maxFileMB)||v.maxFileMB<1||v.maxFileMB>2048)throw fail(400,'单文件限制需为 1–2048 MB');changes.maxFileMB=v.maxFileMB;}if(v.quotaGB!==undefined){if(!Number.isFinite(v.quotaGB)||v.quotaGB<0.1||v.quotaGB>1000)throw fail(400,'存储额度无效');const s=storage();if(v.quotaGB*1024**3>s.used+s.free-3*1024**3)throw fail(400,'额度过大，请至少保留 3GB 磁盘空间');changes.quotaGB=v.quotaGB;}db.transaction(()=>{for(const [k,value]of Object.entries(changes))db.prepare('UPDATE settings SET value=? WHERE key=?').run(JSON.stringify(value),k);})();audit(req,'settings_update',null,changes);res.json(cfg());});
+require('./scifi.cjs')({app,base,db,auth,admin,now,clean,fail,audit,cfg,limit,DATA});
 // A disposable in-memory benchmark: authenticated, bounded, and no user files saved.
 app.post(base+'/speedtest',auth,async(req,res)=>{limit('speed:'+req.user.id,6,3600000);const size=Number(req.get('Content-Length'));if(!Number.isInteger(size)||size<1||size>16*1024**2)throw fail(413,'测速数据最多 16MB');let n=0;const h=crypto.createHash('sha256'),start=process.hrtime.bigint();for await(const chunk of req){n+=chunk.length;if(n>size)throw fail(413,'数据超过限制');h.update(chunk);}const seconds=Number(process.hrtime.bigint()-start)/1e9;audit(req,'speed_test',null,{bytes:n,seconds});res.json({bytes:n,sha256:h.digest('hex'),serverSeconds:seconds});});
 app.use((req,res)=>res.status(404).json({error:'接口不存在'}));
