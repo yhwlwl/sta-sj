@@ -196,5 +196,5 @@ document.addEventListener('click',async e=>{
 });
 window.addEventListener('hashchange',()=>{if(location.hash.startsWith('#receipt=')){state.view='receipt';render();}});
 window.addEventListener('beforeunload',e=>{if(state.busy){e.preventDefault();e.returnValue='';}});
-(async()=>{try{state.meta=await call('/meta');try{state.activity=await call('/scifi/activity');}catch(e){state.activity=fallback;state.previewOnly=true;}state.view=location.hash.startsWith('#receipt=')?'receipt':'home';render();}catch(e){$('#app').innerHTML='<main class="site-main"><section class="panel"><h1>暂时无法连接征集平台</h1><p>'+escape(e.message)+'</p><button class="primary" onclick="location.reload()">重新连接</button></section></main>';}})();
+(async()=>{try{try{state.meta=await call('/meta');}catch(e){state.meta={chunkSize:8388608,maxFileMB:1024};state.previewOnly=true;}try{state.activity=await call('/scifi/activity');}catch(e){state.activity=fallback;state.previewOnly=true;}if(state.previewOnly)state.activity.event.open=false;state.view=location.hash.startsWith('#receipt=')?'receipt':'home';render();}catch(e){$('#app').innerHTML='<main class="site-main"><section class="panel"><h1>暂时无法连接征集平台</h1><p>'+escape(e.message)+'</p><button class="primary" onclick="location.reload()">重新连接</button></section></main>';}})();
 })();
