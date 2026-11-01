@@ -24,7 +24,7 @@ module.exports=function mount({app,base,db,auth,admin,now,clean,fail,audit,cfg,l
  'CREATE INDEX IF NOT EXISTS scifi_filters ON scifi_submissions(status,category_id,grade,class_name,submitted);'
  );
  db.prepare('INSERT OR IGNORE INTO scifi_event(id,title,description,deadline,open) VALUES (?,?,?,?,1)')
- .run(EVENT,'“拓科学教育新路，促想象力提升”科幻创作征集活动','发挥科学想象力，创作属于自己的未来世界。','2027-04-30T23:59:59+08:00');
+ .run(EVENT,'“拓科学教育新路，促想象力提升”科幻创作征集活动','发挥科学想象力，创作属于自己的未来世界。','2027-01-10T23:59:59+08:00');
  const addCategory=db.prepare('INSERT OR IGNORE INTO scifi_categories(id,title,group_name,description,rules,extensions,allow_team) VALUES (?,?,?,?,?,?,?)');
  for(const x of initialCategories)addCategory.run(x[0],x[1],x[2],x[3],x[4],x[5],x[6]);
  const getEvent=()=>db.prepare('SELECT * FROM scifi_event WHERE id=?').get(EVENT);
@@ -61,7 +61,7 @@ module.exports=function mount({app,base,db,auth,admin,now,clean,fail,audit,cfg,l
   if(team&&!members.length)throw fail(400,'请填写团队成员');
   const workType=clean(b.workType,30);
   if(c.id==='tianfu'&&!specialTypes.includes(workType))throw fail(400,'请选择专项作品形式');
-  if(c.id==='aigc'&&(!statement||Array.from(statement).length>200))throw fail(400,'请填写不超过 200 字的 AI 创作说明');
+  if(c.id==='aigc'&&Array.from(statement).length>200)throw fail(400,'创作说明请控制在 200 字内');
   const s={id:randomUUID(),event_id:EVENT,category_id:c.id,user_id:req.user.id,grade,class_name:className,student_name:studentName,work_title:workTitle,work_type:workType,is_team:team?1:0,members:JSON.stringify(members),statement,status:'draft',created:now()};
   db.prepare('INSERT INTO scifi_submissions(id,event_id,category_id,user_id,grade,class_name,student_name,work_title,work_type,is_team,members,statement,status,created) VALUES (@id,@event_id,@category_id,@user_id,@grade,@class_name,@student_name,@work_title,@work_type,@is_team,@members,@statement,@status,@created)').run(s);
   audit(req,'scifi_draft',null,{submission:s.id,category:c.id});
@@ -90,19 +90,8 @@ module.exports=function mount({app,base,db,auth,admin,now,clean,fail,audit,cfg,l
   const c=categoryFor(s.category_id),files=filesFor(s.id);
   if(!files.length)throw fail(400,'请至少上传一个完整的作品文件');
   if(files.some(f=>f.status!=='complete'))throw fail(400,'仍有未完成的附件');
-  const extensions=c.extensions.split(',');
-  for(const f of files){
-   const ext=path.extname(f.filename).replace('.','').toLowerCase();
-   if(!extensions.includes(ext))throw fail(400,'该类别不接受文件格式：'+f.filename);
-  }
-  if(['painting','aigc'].includes(c.id)&&files.length!==1)throw fail(400,'此类别需要提交一份主作品文件');
-  if(['novel','essay'].includes(c.id)&&(files.length!==2||!files.some(f=>/\.pdf$/i.test(f.filename))))throw fail(400,'文学类须提交作品正文和查重报告 PDF，共两份文件');
-  if(s.category_id==='creative'&&!files.some(f=>/\.(pdf|docx)$/i.test(f.filename))&&!s.statement)throw fail(400,'请填写作品说明或上传作品说明文档');
-  if(s.category_id==='tianfu'){
-   const t=s.work_type;
-   const expect=t==='研学游记'||t==='研学故事'?['docx','pdf']:t==='主题绘画'?['jpg','jpeg']:t==='AI 动画'||t==='科普短视频'?['mp4']:null;
-   if(expect&&files.some(f=>!expect.includes(path.extname(f.filename).slice(1).toLowerCase())))throw fail(400,'专项作品格式与所选形式不匹配');
-  }
+  // Business-format and attachment-count rules are guidance only at the collection stage.
+  // Preserve completed-file and access checks without blocking a participant's submission.
   const secret=randomBytes(24).toString('base64url');
   db.prepare("UPDATE scifi_submissions SET status='submitted',submitted=?,receipt_hash=? WHERE id=?").run(now(),createHash('sha256').update(secret).digest('hex'),s.id);
   audit(req,'scifi_submit',null,{submission:s.id,category:c.id,files:files.length});
