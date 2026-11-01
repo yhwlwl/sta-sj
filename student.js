@@ -8,6 +8,18 @@ const bytes=n=>n>=1048576?(n/1048576).toFixed(1)+' MB':(n/1024).toFixed(1)+' KB'
 const state={view:'home',activity:null,category:null,form:null,draft:null,files:[],busy:false,receipt:null,history:[]};
 let token=localStorage.getItem('sj-token')||'';
 const groups=[['novel','📘'],['essay','📝'],['painting','🎨'],['creative','💡'],['aigc','🎬'],['tianfu','🧭']];
+const fallback={
+ event:{title:'“拓科学教育新路，促想象力提升”科幻创作征集活动',description:'发挥科学想象力，创作属于自己的未来世界。',deadline:'2027-01-10T23:59:59+08:00',open:false},
+ categories:[
+ {id:'novel',title:'科幻小说',group:'文学类',description:'描绘未来世界故事。',rules:'2000—30000 字；DOCX/PDF；个人原创，严禁 AI 创作。',extensions:'docx,pdf',allowTeam:false},
+ {id:'essay',title:'科幻作文',group:'文学类',description:'描绘未来理想生活。',rules:'500—1000 字；DOCX/PDF；个人原创，严禁 AI 创作。',extensions:'docx,pdf',allowTeam:false},
+ {id:'painting',title:'科幻绘画',group:'绘画类',description:'以“我和我的未来”为主题。',rules:'手绘扫描 JPG，300dpi，严禁 AI 生成及非手绘制作。',extensions:'jpg,jpeg',allowTeam:false},
+ {id:'creative',title:'科幻文创科创',group:'创意类',description:'科学发明、创意产品、模型和桌游等作品。',rules:'作品说明；实物展示视频 MP4，3 分钟以内、1920×1080。',extensions:'pdf,docx,jpg,jpeg,png,mp4,zip',allowTeam:true},
+ {id:'aigc',title:'AIGC 科幻动画',group:'创意类',description:'原创 AI 辅助科幻动画。',rules:'MP4、30 秒—5 分钟、至少 1080P；200 字以内创作说明。',extensions:'mp4',allowTeam:true},
+ {id:'tianfu',title:'天府科普研学游',group:'专项类',description:'结合四川科教文旅资源开展研学创作。',rules:'根据游记、绘画、视频或 AI 动画等具体形式遵守相应类别要求。',extensions:'docx,pdf,jpg,jpeg,png,mp4,zip',allowTeam:true}
+ ],specialTypes:['研学游记','研学故事','主题绘画','科普短视频','AI 动画','研学线路创意']
+};
+
 const nameFor=id=>state.activity?.categories.find(c=>c.id===id)?.title||id;
 const error=e=>{const box=$('#notice');if(box){box.textContent=e.message||String(e);box.hidden=false;box.scrollIntoView({behavior:'smooth',block:'nearest'});}else alert(e.message||String(e));};
 async function call(route,method='GET',body,extra={}){
@@ -24,7 +36,7 @@ const head=()=>'<header class="site-head"><a href="/" class="brand" data-view="h
 const foot=()=>'<footer class="site-foot">科幻创作征集 · 原文件安全传输，未经许可不公开展示作品。<br>管理员与评选工作人员可依法依规处理投稿信息。</footer>';
 const notice=()=>'<div class="notice" id="notice" role="alert" hidden></div>';
 function shell(inner){
- $('#app').innerHTML=head()+'<main class="site-main">'+notice()+inner+'</main>'+foot();
+ $('#app').innerHTML=head()+'<main class="site-main">'+notice()+(state.previewOnly?'<div class="hint" role="status">开发预览：科幻收件后端尚未上线。当前只可浏览活动和类别说明，不能正式投稿。</div>':'')+inner+'</main>'+foot();
  window.scrollTo({top:0,behavior:'instant'});
 }
 function go(view){if(state.busy)return;state.view=view;render();}
@@ -184,5 +196,5 @@ document.addEventListener('click',async e=>{
 });
 window.addEventListener('hashchange',()=>{if(location.hash.startsWith('#receipt=')){state.view='receipt';render();}});
 window.addEventListener('beforeunload',e=>{if(state.busy){e.preventDefault();e.returnValue='';}});
-(async()=>{try{const [a,m]=await Promise.all([call('/scifi/activity'),call('/meta')]);state.activity=a;state.meta=m;state.view=location.hash.startsWith('#receipt=')?'receipt':'home';render();}catch(e){$('#app').innerHTML='<main class="site-main"><section class="panel"><h1>暂时无法连接征集平台</h1><p>'+escape(e.message)+'</p><button class="primary" onclick="location.reload()">重新连接</button></section></main>';}})();
+(async()=>{try{state.meta=await call('/meta');try{state.activity=await call('/scifi/activity');}catch(e){state.activity=fallback;state.previewOnly=true;}state.view=location.hash.startsWith('#receipt=')?'receipt':'home';render();}catch(e){$('#app').innerHTML='<main class="site-main"><section class="panel"><h1>暂时无法连接征集平台</h1><p>'+escape(e.message)+'</p><button class="primary" onclick="location.reload()">重新连接</button></section></main>';}})();
 })();
