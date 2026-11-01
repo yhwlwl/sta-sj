@@ -17,6 +17,10 @@ CREATE TABLE IF NOT EXISTS tickets(hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,i
 CREATE INDEX IF NOT EXISTS uploads_owner ON uploads(user_id,created);
 CREATE INDEX IF NOT EXISTS audit_created ON audit(created);
 CREATE INDEX IF NOT EXISTS audit_event ON audit(event,created);`);
+// An additive migration keeps existing admin accounts and every submission intact.
+if(!db.pragma('table_info(users)').some(col=>col.name==='is_superadmin'))
+ db.exec('ALTER TABLE users ADD COLUMN is_superadmin INTEGER NOT NULL DEFAULT 0');
+db.prepare("UPDATE users SET is_superadmin=1 WHERE username='tle' AND role='admin' AND is_superadmin=0").run();
 const defaults={title:'素材征集',notice:'请提交原始文件。图片与视频不会被压缩或转码；请勿提交与本次征集无关的内容。',open:true,guests:true,registration:true,maxFileMB:1024,quotaGB:8};
 for(const [k,v] of Object.entries(defaults))db.prepare('INSERT OR IGNORE INTO settings VALUES (?,?)').run(k,JSON.stringify(v));
 const cfg=()=>Object.fromEntries(db.prepare('SELECT * FROM settings').all().map(x=>[x.key,JSON.parse(x.value)]));
@@ -40,7 +44,7 @@ function limit(key,max,period){const t=Date.now(),r=rates.get(key);if(!r||r.unti
 function audit(req,event,fileId=null,details={}){
  db.prepare('INSERT INTO audit(created,actor_id,actor,event,file_id,ip,details) VALUES (?,?,?,?,?,?,?)').run(now(),req.user?.id||null,req.user?.name||'未登录',event,fileId,req.ip||'',JSON.stringify(details));
 }
-function safeUser(u){return {id:u.id,username:u.username,name:u.name,role:u.role,created:u.created};}
+function safeUser(u){return {id:u.id,username:u.username,name:u.name,role:u.role,isSuperadmin:!!u.is_superadmin,created:u.created};}
 async function passwordHash(p){const salt=crypto.randomBytes(16).toString('hex');return salt+':'+Buffer.from(await scrypt(p,salt,64)).toString('hex');}
 async function passwordOK(p,stored){if(!stored||typeof p!=='string'||p.length>128)return false;const [salt,h]=stored.split(':');const actual=Buffer.from(await scrypt(p,salt,64));const expected=Buffer.from(h,'hex');return expected.length===actual.length&&crypto.timingSafeEqual(expected,actual);}
 function checkPassword(p){if(typeof p!=='string'||p.length<10||p.length>128)throw fail(400,'密码请使用 10–128 个字符');}
@@ -49,6 +53,7 @@ function username(s){const n=clean(s,40).toLowerCase();if(!/^[a-z0-9_][a-z0-9_.-
 function issue(req,u){const token=crypto.randomBytes(32).toString('base64url'),ttl=u.role==='admin'?7200000:7*86400000;db.prepare('INSERT INTO sessions VALUES (?,?,?)').run(hash(token),u.id,Date.now()+ttl);req.user=u;return {token,user:safeUser(u),expires:Date.now()+ttl};}
 function auth(req,res,next){try{const token=(req.get('Authorization')||'').replace(/^Bearer /,'');const u=db.prepare('SELECT users.* FROM sessions JOIN users ON users.id=sessions.user_id WHERE sessions.hash=? AND sessions.expires>? AND users.disabled=0').get(hash(token),Date.now());if(!u)throw fail(401,'登录已过期，请重新登录');req.user=u;req.tokenHash=hash(token);next();}catch(e){next(e);}}
 function admin(req,res,next){if(req.user.role!=='admin')return next(fail(403,'需要管理员权限'));next();}
+function superadmin(req,res,next){if(req.user.role!=='admin'||req.user.is_superadmin!==1)return next(fail(403,'需要超级管理员权限'));next();}
 function owned(req,id){const f=db.prepare('SELECT * FROM uploads WHERE id=?').get(id);if(!f||(f.user_id!==req.user.id&&req.user.role!=='admin'))throw fail(404,'找不到该文件');return f;}
 function storage(){const used=db.prepare("SELECT COALESCE(SUM(size),0) n FROM uploads WHERE status IN ('complete','uploading','trash')").get().n;const stat=fs.statfsSync(DATA);return {used,free:Number(stat.bavail)*Number(stat.bsize),quota:cfg().quotaGB*1024**3};}
 const setupPath=path.join(DATA,'setup-token');
@@ -160,6 +165,23 @@ function csv(rows,columns){const cell=v=>{let s=String(v??'');if(/^[=+@\-\t\r]/.
 app.get(base+'/admin/files.csv',auth,admin,(req,res)=>{const {sql,params}=fileWhere(req);const rows=db.prepare('SELECT f.*,u.name owner FROM uploads f JOIN users u ON u.id=f.user_id WHERE '+sql+' ORDER BY f.created DESC LIMIT 10000').all(...params);audit(req,'export_files',null,{count:rows.length});res.type('text/csv; charset=utf-8').attachment('files.csv').send(csv(rows,[['id','编号'],['filename','文件名'],['owner','提交人'],['size','字节'],['status','状态'],['category','类型'],['note','说明'],['sha256','SHA256'],['created','提交时间'],['completed','完成时间'],['ip','来源IP']]));});
 app.get(base+'/admin/logs',auth,admin,(req,res)=>{const {limit,offset}=pagination(req),params=[];let sql='1=1';if(req.query.event){sql+=' AND event=?';params.push(clean(req.query.event,50));}if(req.query.q){sql+=' AND (actor LIKE ? OR ip LIKE ? OR details LIKE ?)';const q='%'+clean(req.query.q,100)+'%';params.push(q,q,q);}res.json({total:db.prepare('SELECT COUNT(*) n FROM audit WHERE '+sql).get(...params).n,logs:db.prepare('SELECT * FROM audit WHERE '+sql+' ORDER BY id DESC LIMIT ? OFFSET ?').all(...params,limit,offset)});});
 app.get(base+'/admin/logs.csv',auth,admin,(req,res)=>{const rows=db.prepare('SELECT * FROM audit ORDER BY id DESC LIMIT 10000').all();audit(req,'export_logs',null,{count:rows.length});res.type('text/csv; charset=utf-8').attachment('logs.csv').send(csv(rows,[['id','编号'],['created','时间'],['actor','操作者'],['event','操作'],['file_id','文件编号'],['ip','来源IP'],['details','详情']]));});
+// Administrators created here are ordinary admins, never superadmins.
+app.get(base+'/admin/super/admins',auth,admin,superadmin,(req,res)=>{
+ const rows=db.prepare("SELECT id,username,name,role,is_superadmin,disabled,created FROM users WHERE role='admin' ORDER BY is_superadmin DESC,created ASC").all();
+ res.json({admins:rows.map(u=>({id:u.id,username:u.username,name:u.name,isSuperadmin:!!u.is_superadmin,disabled:!!u.disabled,created:u.created}))});
+});
+app.post(base+'/admin/super/admins',auth,admin,superadmin,async(req,res)=>{
+ limit('superadmin:create:'+req.user.id,12,3600000);
+ const name=username(req.body.username),displayName=clean(req.body.name,60)||name;
+ checkPassword(req.body.password);
+ if(db.prepare('SELECT id FROM users WHERE username=?').get(name))throw fail(409,'该账号已存在');
+ const pass=await passwordHash(req.body.password);
+ const u={id:uid(),username:name,name:displayName,pass,role:'admin',created:now()};
+ try{db.prepare('INSERT INTO users(id,username,name,pass,role,is_superadmin,created) VALUES (?,?,?,?,?,0,?)').run(u.id,u.username,u.name,u.pass,u.role,u.created);}
+ catch(e){if(e.code?.includes('CONSTRAINT'))throw fail(409,'该账号已存在');throw e;}
+ audit(req,'admin_create',null,{id:u.id,username:u.username});
+ res.status(201).json({admin:{id:u.id,username:u.username,name:u.name,role:u.role,isSuperadmin:false,created:u.created}});
+});
 app.get(base+'/admin/users',auth,admin,(req,res)=>{const {limit,offset}=pagination(req),q='%'+clean(req.query.q,100)+'%';res.json({total:db.prepare('SELECT COUNT(*) n FROM users WHERE name LIKE ? OR COALESCE(username,\'\') LIKE ?').get(q,q).n,users:db.prepare("SELECT u.id,u.username,u.name,u.role,u.disabled,u.created,(SELECT COUNT(*) FROM uploads f WHERE f.user_id=u.id AND f.status IN ('complete','trash')) uploads,(SELECT COALESCE(SUM(size),0) FROM uploads f WHERE f.user_id=u.id AND f.status IN ('complete','trash')) bytes FROM users u WHERE name LIKE ? OR COALESCE(username,'') LIKE ? ORDER BY created DESC LIMIT ? OFFSET ?").all(q,q,limit,offset)});});
 app.post(base+'/admin/users/:id/toggle',auth,admin,(req,res)=>{if(req.params.id===req.user.id)throw fail(400,'不能停用当前管理员');const u=db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id);if(!u||u.role==='admin')throw fail(400,'不能修改此账号');db.transaction(()=>{db.prepare('UPDATE users SET disabled=? WHERE id=?').run(u.disabled?0:1,u.id);if(!u.disabled)db.prepare('DELETE FROM sessions WHERE user_id=?').run(u.id);})();audit(req,u.disabled?'user_enable':'user_disable',null,{id:u.id,name:u.name});res.json({ok:true});});
 app.get(base+'/admin/settings',auth,admin,(req,res)=>res.json({...cfg(),storage:storage()}));
